@@ -46,10 +46,13 @@
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <!-- We will create a custom tab named 'Markdown' in the Word Ribbon! -->
             <CustomTab id="MarkdownTab">
-              <Label resid="MarkdownTab.Label" />
-              
               <Group id="MarkdownGroup">
                 <Label resid="MarkdownGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
                 
                 <!-- Button 1: Toggle Task Pane -->
                 <Control xsi:type="Button" id="OpenMarkdownBtn">
@@ -69,6 +72,7 @@
                 </Control>
                 
               </Group>
+              <Label resid="MarkdownTab.Label" />
             </CustomTab>
           </ExtensionPoint>
         </DesktopFormFactor>
