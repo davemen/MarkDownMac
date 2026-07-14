@@ -4,7 +4,8 @@
   "description": "Microsoft Word for Mac Add-in to read and write Markdown files.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "sideload": "node sideload.js"
   },
   "dependencies": {
     "express": "^4.19.2"
