@@ -1,0 +1,15 @@
+{
+  "name": "markdown-word-add-in",
+  "version": "1.0.0",
+  "description": "Microsoft Word for Mac Add-in to read and write Markdown files.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {},
+  "author": "Antigravity",
+  "license": "MIT"
+}

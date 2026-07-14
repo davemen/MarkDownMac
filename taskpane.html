@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Markdown Word</title>
+    
+    <!-- Office JavaScript API -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+    
+    <!-- Markdown Parsers -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <!-- Styling -->
+    <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body class="theme-dark">
+    <!-- Top Auto-Detect Notification Banner -->
+    <div id="detect-banner" class="banner hidden">
+        <div class="banner-content">
+            <span class="banner-icon">💡</span>
+            <div class="banner-text">
+                <strong>Raw Markdown Detected</strong>
+                <p>This document seems to contain raw markdown. Convert it to Word styles?</p>
+            </div>
+        </div>
+        <button id="btn-banner-convert" class="btn btn-banner btn-glow">Format Document</button>
+    </div>
+
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <span class="logo">M↓</span>
+                <div class="brand-info">
+                    <h1>Markdown Word</h1>
+                    <span id="connection-status" class="status-badge connecting">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="app-tabs">
+            <button id="tab-import" class="tab-btn active" data-target="panel-import">
+                <span class="tab-icon">📥</span> Import MD
+            </button>
+            <button id="tab-export" class="tab-btn" data-target="panel-export">
+                <span class="tab-icon">📤</span> Export MD
+            </button>
+        </nav>
+
+        <!-- Content Panels -->
+        <main class="app-main">
+            <!-- Alert Banner for Messages -->
+            <div id="feedback-alert" class="alert hidden">
+                <span id="alert-message">Status message here</span>
+                <button id="btn-close-alert" class="alert-close">&times;</button>
+            </div>
+
+            <!-- Panel 1: Import / Render -->
+            <section id="panel-import" class="tab-panel active">
+                <div class="card drag-zone" id="drop-zone">
+                    <span class="drop-icon">📄</span>
+                    <h3>Drag & Drop Markdown File</h3>
+                    <p>or click to browse your files</p>
+                    <input type="file" id="file-input" accept=".md,.markdown,.txt" class="hidden-file-input" />
+                    <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">Browse Files</button>
+                </div>
+
+                <div class="form-group">
+                    <label for="insert-location">Insertion Point</label>
+                    <select id="insert-location" class="form-control">
+                        <option value="replace">Replace Entire Document</option>
+                        <option value="cursor">Insert at Cursor</option>
+                    </select>
+                </div>
+
+                <!-- Preview Area -->
+                <div id="import-preview-container" class="form-group hidden">
+                    <div class="preview-header">
+                        <label>Loaded Markdown Preview</label>
+                        <div class="preview-actions">
+                            <button id="btn-edit-import" class="btn-text">Edit Raw</button>
+                            <button id="btn-preview-import" class="btn-text active">Rendered</button>
+                        </div>
+                    </div>
+                    
+                    <div id="import-editor-wrapper" class="hidden">
+                        <textarea id="import-markdown-textarea" class="code-textarea" placeholder="Paste or edit Markdown here..."></textarea>
+                    </div>
+                    <div id="import-preview-wrapper" class="preview-box"></div>
+                    
+                    <div class="action-bar">
+                        <button id="btn-clear-import" class="btn btn-secondary">Clear</button>
+                        <button id="btn-insert-document" class="btn btn-primary btn-glow">Insert into Word</button>
+                    </div>
+                </div>
+
+                <!-- Empty state pasting option -->
+                <div id="paste-prompt" class="card mt-2">
+                    <h3>Or Paste Markdown directly</h3>
+                    <textarea id="direct-paste-textarea" class="code-textarea" placeholder="Paste your markdown content here and we'll format it into the document..."></textarea>
+                    <div class="action-bar mt-1">
+                        <button id="btn-insert-pasted" class="btn btn-primary">Format and Insert</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Panel 2: Export / Save -->
+            <section id="panel-export" class="tab-panel">
+                <div class="card text-center">
+                    <h3>Convert Document to Markdown</h3>
+                    <p>Read all content and formatting from your current Word document and translate it back to clean Markdown.</p>
+                    <button id="btn-extract-markdown" class="btn btn-primary btn-glow mt-1">Extract Document Content</button>
+                </div>
+
+                <div id="export-preview-container" class="form-group hidden mt-2">
+                    <div class="preview-header">
+                        <label>Generated Markdown</label>
+                        <span class="word-count" id="export-word-count">0 characters</span>
+                    </div>
+                    <textarea id="export-markdown-textarea" class="code-textarea" readonly></textarea>
+                    
+                    <div class="action-bar">
+                        <button id="btn-copy-markdown" class="btn btn-secondary">Copy to Clipboard</button>
+                        <button id="btn-download-markdown" class="btn btn-primary btn-glow">Download .MD File</button>
+                    </div>
+                    
+                    <div class="info-note mt-1">
+                        <p>💡 <strong>To save as .docx:</strong> Simply use Word's native file menu: <strong>File &gt; Save As &gt; Word Document (.docx)</strong>.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Powered by <strong>Antigravity Engine</strong></p>
+        </footer>
+    </div>
+    
+    <!-- Script Logic -->
+    <script type="text/javascript" src="taskpane.js"></script>
+</body>
+</html>
