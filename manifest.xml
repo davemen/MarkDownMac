@@ -17,10 +17,10 @@
   <Description DefaultValue="Allows opening, editing, rendering, and saving Markdown (.md) documents natively in Microsoft Word for Mac." />
   
   <!-- Icons for the add-in. Since it's local host, we use our local assets. -->
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png" />
+  <IconUrl DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-80.png" />
   
-  <SupportUrl DefaultValue="https://localhost:3000/support.html" />
+  <SupportUrl DefaultValue="https://davemen.github.io/MarkDownMac/support.html" />
   
   <!-- Specify that this is a Document (Word) Add-in -->
   <Hosts>
@@ -29,7 +29,7 @@
   
   <!-- Default location of the task pane web page -->
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html" />
+    <SourceLocation DefaultValue="https://davemen.github.io/MarkDownMac/taskpane.html" />
   </DefaultSettings>
   
   <!-- Permissions needed by the add-in -->
@@ -78,14 +78,14 @@
     <!-- String and Image Resources -->
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png" />
+        <bt:Image id="Icon.16x16" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-80.png" />
       </bt:Images>
       
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://davemen.github.io/MarkDownMac/commands.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://davemen.github.io/MarkDownMac/taskpane.html" />
       </bt:Urls>
       
       <bt:ShortStrings>
