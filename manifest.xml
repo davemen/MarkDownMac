@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--Id: c22b10a2-23f2-4980-9946-b33a2fe212bc -->
+<!--Id: c22b10a2-23f2-4980-9946-b33a2fe212bd -->
 <OfficeApp 
   xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" 
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
@@ -7,7 +7,7 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
   
-  <Id>c22b10a2-23f2-4980-9946-b33a2fe212bc</Id>
+  <Id>c22b10a2-23f2-4980-9946-b33a2fe212bd</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>Antigravity</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
@@ -17,8 +17,8 @@
   <Description DefaultValue="Allows opening, editing, rendering, and saving Markdown (.md) documents natively in Microsoft Word for Mac." />
   
   <!-- Icons for the add-in. Since it's local host, we use our local assets. -->
-  <IconUrl DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-80.png" />
+  <IconUrl DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-32.png?v=2" />
+  <HighResolutionIconUrl DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-80.png?v=2" />
   
   <SupportUrl DefaultValue="https://davemen.github.io/MarkDownMac/support.html" />
   
@@ -81,9 +81,9 @@
     <!-- String and Image Resources -->
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-80.png" />
+        <bt:Image id="Icon.16x16" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-16.png?v=2" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-32.png?v=2" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://davemen.github.io/MarkDownMac/assets/icon-80.png?v=2" />
       </bt:Images>
       
       <bt:Urls>
