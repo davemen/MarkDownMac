@@ -4,6 +4,16 @@ A Microsoft Word for Mac Add-in that allows you to natively read, write, edit, a
 
 ---
 
+## Teaser
+
+https://github.com/davemen/MarkDownMac/raw/main/motion/out/markdownmac-teaser.mp4
+
+[![MarkDownMac teaser: Markdown in, Word out](motion/out/teaser-poster.jpg)](motion/out/markdownmac-teaser.mp4)
+
+*A 20-second cinematic teaser, rendered entirely from code. Source and render pipeline live in [`motion/`](motion/README.md).*
+
+---
+
 ## Features
 
 - **📥 Import Markdown**: Drag & drop or browse `.md` / `.txt` files, edit the raw markdown source in a clean editor, preview the HTML rendering, and insert it directly into your document (either replacing the entire document or inserting at the cursor).
