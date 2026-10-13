@@ -6,9 +6,9 @@ A Microsoft Word for Mac Add-in that allows you to natively read, write, edit, a
 
 ## Teaser
 
-https://github.com/davemen/MarkDownMac/raw/main/motion/out/markdownmac-teaser.mp4
+[![MarkDownMac teaser: Markdown in, Word out](motion/out/markdownmac-teaser.gif)](motion/out/markdownmac-teaser.mp4)
 
-[![MarkDownMac teaser: Markdown in, Word out](motion/out/teaser-poster.jpg)](motion/out/markdownmac-teaser.mp4)
+**[▶ Watch the full 1080p teaser with sound (MP4)](motion/out/markdownmac-teaser.mp4)**
 
 *A 20-second cinematic teaser, rendered entirely from code. Source and render pipeline live in [`motion/`](motion/README.md).*
 
