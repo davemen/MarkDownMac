@@ -1,0 +1,431 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MarkDownMac teaser scene</title>
+<style>
+  @font-face { font-family: 'Space Grotesk'; src: url(fonts/Space_Grotesk.woff2) format('woff2'); font-weight: 700; }
+  @font-face { font-family: 'JetBrains Mono'; src: url(fonts/JetBrains_Mono.woff2) format('woff2'); font-weight: 400; }
+  html, body { margin: 0; background: #000; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="out" width="1920" height="1080"></canvas>
+<script>
+// Deterministic, frame-indexed motion-graphics scene.
+// window.renderFrame(frame) draws frame `frame` (30 fps) and returns a JPEG data URL.
+
+const W = 1920, H = 1080, FPS = 30, DUR = 20;
+const CUT = { s2: 4.2, s3: 9.0, s4: 14.0, s5: 17.5 };
+const BAR = 138; // 2.39:1 letterbox
+
+const out = document.getElementById('out');
+const octx = out.getContext('2d', { alpha: false });
+const mk = (w = W, h = H) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+const sc = mk(), sctx = sc.getContext('2d', { alpha: false });
+const sb = mk(), sbctx = sb.getContext('2d', { alpha: false });
+const tmp = mk(), tctx = tmp.getContext('2d', { alpha: false });
+const cardC = mk(1040, 1360), cctx = cardC.getContext('2d');
+
+// ---------- utils ----------
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, u) => a + (b - a) * u;
+const ss = (a, b, x) => { const u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+const lin = (a, b, x) => clamp((x - a) / (b - a), 0, 1);
+const eoExpo = u => u >= 1 ? 1 : 1 - Math.pow(2, -10 * u);
+const eiExpo = u => u <= 0 ? 0 : Math.pow(2, 10 * (u - 1));
+const eioCubic = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+const eoCubic = u => 1 - Math.pow(1 - u, 3);
+const hash = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const bell = (a, b, x) => Math.sin(Math.PI * lin(a, b, x));
+
+const R = mulberry32(20261013);
+
+function bg(ctx, inner, outer, cx = W / 2, cy = H / 2) {
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.75);
+  g.addColorStop(0, inner); g.addColorStop(1, outer);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function glow(ctx, x, y, r, color, comp = 'screen') {
+  ctx.save(); ctx.globalCompositeOperation = comp;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.restore();
+}
+function text(ctx, str, x, y, o) {
+  const { font, size, color = '#fff', align = 'center', blur = 0, ls = 0, alpha = 1, weight = 700, baseline = 'middle', comp } = o;
+  ctx.save(); ctx.globalAlpha = alpha; if (comp) ctx.globalCompositeOperation = comp;
+  ctx.font = `${weight} ${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = baseline;
+  ctx.letterSpacing = `${ls}px`; if (blur > 0) ctx.filter = `blur(${blur}px)`;
+  ctx.fillStyle = color; ctx.fillText(str, x + (align === 'center' ? ls / 2 : 0), y); ctx.restore();
+}
+
+// ---------- shared elements ----------
+const DUST = Array.from({ length: 460 }, () => ({ x: R(), y: R(), z: 0.25 + R() * 1.15, s: 0.6 + R() * 1.7, ph: R() * 6.28, sp: 0.004 + R() * 0.012 }));
+function drawDust(ctx, t, zoom, alphaMul = 1, color = '220,236,255') {
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  for (const p of DUST) {
+    const z = p.z, y = ((p.y - t * p.sp / z) % 1 + 1) % 1, x = p.x + 0.02 * Math.sin(t * 0.3 + p.ph);
+    const f = zoom / z, sx = W / 2 + (x - 0.5) * W * f, sy = H / 2 + (y - 0.5) * H * f;
+    if (sx < -30 || sx > W + 30 || sy < -30 || sy > H + 30) continue;
+    const tw = 0.5 + 0.5 * Math.sin(t * 2 + p.ph * 3);
+    const a = clamp((1.45 - z) * 0.5, 0.05, 0.7) * (0.35 + 0.65 * tw) * alphaMul, r = p.s * f;
+    if (r > 4) { const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 1.6); g.addColorStop(0, `rgba(${color},${a * 0.5})`); g.addColorStop(1, `rgba(${color},0)`); ctx.fillStyle = g; ctx.fillRect(sx - r * 1.6, sy - r * 1.6, r * 3.2, r * 3.2); }
+    else { ctx.fillStyle = `rgba(${color},${a})`; ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill(); }
+  }
+  ctx.restore();
+}
+const FOG = Array.from({ length: 7 }, () => ({ x: R(), y: R(), r: 320 + R() * 520, ph: R() * 6.28, sp: 0.05 + R() * 0.06 }));
+function drawFog(ctx, t, alpha, col = '110,150,255') {
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  for (const f of FOG) {
+    const x = W * (f.x + 0.08 * Math.sin(t * f.sp + f.ph)), y = H * (f.y + 0.06 * Math.cos(t * f.sp * 1.3 + f.ph));
+    const g = ctx.createRadialGradient(x, y, 0, x, y, f.r); g.addColorStop(0, `rgba(${col},${alpha})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - f.r, y - f.r, f.r * 2, f.r * 2);
+  }
+  ctx.restore();
+}
+function drawRays(ctx, t, intensity) {
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 5; i++) {
+    const sway = Math.sin(t * 0.4 + i * 1.3) * 60, x0 = W / 2 + (i - 2) * 90 + sway, w0 = 40 + i * 10;
+    const x1 = x0 + (i - 2) * 420 + sway * 2, w1 = 420 + i * 60;
+    const g = ctx.createLinearGradient(0, -100, 0, H), a = intensity * (0.10 + 0.04 * Math.sin(t * 0.9 + i));
+    g.addColorStop(0, `rgba(170,215,255,${a})`); g.addColorStop(1, 'rgba(170,215,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x0 - w0, -100); ctx.lineTo(x0 + w0, -100); ctx.lineTo(x1 + w1, H + 50); ctx.lineTo(x1 - w1, H + 50); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+// letters that rise and sharpen one by one
+function staggerText(ctx, str, x, y, tl, start, o) {
+  const { font, size, ls = 0, color = '#fff', stagger = 0.045, dur = 0.55, rise = 46, exit = Infinity } = o;
+  ctx.save(); ctx.font = `700 ${size}px ${font}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.letterSpacing = `${ls}px`;
+  const total = ctx.measureText(str).width - ls; let cx = x - total / 2;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i], w = ctx.measureText(ch).width;
+    const u = eoExpo(lin(start + i * stagger, start + i * stagger + dur, tl));
+    const ex = lin(exit, exit + 0.35, tl);
+    const a = u * (1 - ex), dy = (1 - u) * rise - ex * ex * 60, bl = (1 - u) * 14 + ex * 10;
+    if (a > 0.001) { ctx.save(); ctx.globalAlpha = a; ctx.filter = bl > 0.3 ? `blur(${bl}px)` : 'none'; ctx.fillStyle = color; ctx.fillText(ch, cx, y + dy); ctx.restore(); }
+    cx += w;
+  }
+  ctx.restore();
+}
+
+// ---------- scene 1: void / "MARKDOWN." / crash zoom ----------
+function scene1(ctx, t) {
+  bg(ctx, '#0a1020', '#03050a');
+  const cz = t > 3.4 ? 1 + eiExpo((t - 3.4) / 0.8) * 12 : 1;
+  const zoom = 1 + 0.06 * t + (cz - 1) * 0.5;
+  drawRays(ctx, t, 0.9);
+  drawFog(ctx, t, 0.07);
+  drawDust(ctx, t, zoom);
+  glow(ctx, W / 2, H / 2 + 20, 520, `rgba(80,140,255,${0.10 + 0.05 * Math.sin(t)})`);
+
+  const u1 = ss(0.5, 1.4, t) * (1 - lin(3.6, 3.9, t));
+  text(ctx, 'WRITE IN', W / 2, H / 2 - 150, { font: 'Inter', weight: 500, size: 34, ls: 16, alpha: u1 * 0.85, color: '#9fd7ff' });
+
+  const u2 = lin(1.1, 2.5, t), e = eoExpo(u2), blur = (1 - e) * 40, ls = lerp(70, 4, e);
+  ctx.save(); ctx.translate(W / 2, H / 2 + 10); ctx.scale(cz, cz);
+  if (cz > 1.05) { // radial-blur echoes during the crash zoom
+    for (let k = 5; k >= 1; k--) { const s = 1 + k * 0.035 * Math.min(cz, 4); ctx.save(); ctx.scale(s, s); text(ctx, 'MARKDOWN.', 0, 0, { font: '"Space Grotesk"', size: 190, ls, alpha: 0.12, color: '#bfe9ff' }); ctx.restore(); }
+  }
+  text(ctx, 'MARKDOWN.', 0, 0, { font: '"Space Grotesk"', size: 190, ls, blur, alpha: u2 });
+  ctx.restore();
+
+  // underline sweep
+  const uu = lin(2.3, 3.1, t);
+  if (uu > 0 && cz < 1.5) { const w = 560 * eoCubic(uu); ctx.save(); ctx.globalCompositeOperation = 'screen'; const g = ctx.createLinearGradient(W / 2 - w / 2, 0, W / 2 + w / 2, 0); g.addColorStop(0, 'rgba(110,220,255,0)'); g.addColorStop(0.5, 'rgba(160,235,255,0.9)'); g.addColorStop(1, 'rgba(110,220,255,0)'); ctx.fillStyle = g; ctx.fillRect(W / 2 - w / 2, H / 2 + 130, w, 3); ctx.restore(); }
+}
+
+// ---------- scene 2: glyph tunnel / "DELIVER IN WORD." ----------
+const GLY = ['#', '##', '**', '_', '`', '>', '-', '[ ]', '###', '*', '```', '1.', '---', '[x]', '|', '![]', '[]()'];
+const GL = Array.from({ length: 340 }, () => { let x, y; do { x = R() * 2 - 1; y = R() * 2 - 1; } while (Math.hypot(x, y) < 0.2); const c = R(); return { x, y, z: R(), g: GLY[(R() * GLY.length) | 0], col: c < 0.16 ? '#ffb15e' : c < 0.26 ? '#ffffff' : '#7fe3ff', rot: (R() - 0.5) * 0.7 }; });
+function tunnelSpeed(tl) { // units of depth per second
+  if (tl < 1.4) return lerp(2.4, 0.55, eoCubic(tl / 1.4));
+  if (tl < 3.4) return 0.55;
+  return lerp(0.55, 3.4, eiExpo((tl - 3.4) / 1.4));
+}
+function tunnelDist(tl) { let d = 0; const dt = 1 / 240; for (let s = 0; s < tl; s += dt) d += tunnelSpeed(s) * dt; return d; }
+function scene2(ctx, t) {
+  bg(ctx, '#071224', '#02040a');
+  const d = tunnelDist(t), sp = tunnelSpeed(t);
+  const roll = 0.12 * Math.sin(t * 0.55) + 0.05 * t * lin(3.4, 4.8, t);
+  const cx = W / 2 + 80 * Math.sin(t * 0.4), cy = H / 2 + 40 * Math.cos(t * 0.3);
+  const endGlow = ss(3.4, 4.8, t);
+  glow(ctx, cx, cy, 240 + 500 * endGlow, `rgba(120,215,255,${0.22 + 0.7 * endGlow})`);
+  drawFog(ctx, t, 0.05, '80,140,255');
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(roll);
+  const items = GL.map(g => { const zr = ((g.z - d) % 1 + 1) % 1; return { g, zr }; }).sort((a, b) => b.zr - a.zr);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const { g, zr } of items) {
+    const fog = Math.pow(clamp(1 - zr, 0, 1), 1.7) * ss(0, 0.035, zr);
+    if (fog < 0.01) continue;
+    const proj = z => 0.9 / (z * 4 + 0.08);
+    const trailN = 3, dz = 0.011 * sp;
+    for (let k = trailN; k >= 0; k--) {
+      const z = zr + k * dz, f = proj(z), px = g.x * W * 0.5 * f, py = g.y * H * 0.5 * f, size = 54 * f;
+      const a = fog * (k === 0 ? 1 : 0.32 / k);
+      ctx.save(); ctx.translate(px, py); ctx.rotate(g.rot); ctx.globalAlpha = clamp(a, 0, 1);
+      ctx.font = `400 ${size}px "JetBrains Mono"`; ctx.fillStyle = g.col;
+      if (k === 0 && f > 1.3) { ctx.shadowColor = g.col; ctx.shadowBlur = 24 * f; }
+      ctx.fillText(g.g, 0, 0); ctx.restore();
+    }
+  }
+  ctx.restore();
+  // speed lines near the end
+  if (endGlow > 0) { ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.translate(cx, cy); for (let i = 0; i < 90; i++) { const a = hash(i * 7.3) * 6.283, r0 = 120 + hash(i * 3.1) * 500, len = 60 + 900 * endGlow * hash(i * 9.7); ctx.strokeStyle = `rgba(170,230,255,${0.35 * endGlow * hash(i)})`; ctx.lineWidth = 1 + 2 * endGlow; ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); ctx.lineTo(Math.cos(a) * (r0 + len), Math.sin(a) * (r0 + len)); ctx.stroke(); } ctx.restore(); }
+  staggerText(ctx, 'DELIVER IN WORD.', W / 2, H / 2 + 8, t, 1.9, { font: '"Space Grotesk"', size: 150, ls: 6, exit: 4.25 });
+  // lens dirt streak across text
+  const st = bell(1.9, 3.2, t);
+  if (st > 0) { ctx.save(); ctx.globalCompositeOperation = 'screen'; const g = ctx.createLinearGradient(0, H / 2 - 40, 0, H / 2 + 40); g.addColorStop(0, 'rgba(120,200,255,0)'); g.addColorStop(0.5, `rgba(150,220,255,${0.22 * st})`); g.addColorStop(1, 'rgba(120,200,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, H / 2 - 40, W, 80); ctx.restore(); }
+}
+
+// ---------- scene 3: markdown → word transformation ----------
+const MD = ['# Q3 Launch Plan', '', '**Owner:** Dave   _Status:_ Draft', '', '## Goals', '- Ship MarkDownMac 1.0', '- Cut doc prep time by **80%**', '- `Cmd + Shift + M` to export', '', '> Write once. Format never.'];
+const MD_TOTAL = MD.reduce((n, l) => n + l.length + 1, 0);
+const DOC = [ // formatted (Word) version: segments per line
+  { h: 1, segs: [{ t: 'Q3 Launch Plan' }] },
+  { segs: [{ t: 'Owner: ', b: 1 }, { t: 'Dave     ' }, { t: 'Status: ', i: 1 }, { t: 'Draft' }] },
+  { gap: 1 },
+  { h: 2, segs: [{ t: 'Goals' }] },
+  { bullet: 1, segs: [{ t: 'Ship MarkDownMac 1.0' }] },
+  { bullet: 1, segs: [{ t: 'Cut doc prep time by ' }, { t: '80%', b: 1 }] },
+  { bullet: 1, segs: [{ t: 'Cmd + Shift + M', code: 1 }, { t: ' to export' }] },
+  { gap: 1 },
+  { quote: 1, segs: [{ t: 'Write once. Format never.', i: 1 }] },
+];
+const PANEL = { x: 370, y: 150, w: 1180, h: 780 };
+const SPARK = Array.from({ length: 70 }, () => ({ y: R(), dx: R() * 160, s: 1 + R() * 2.5, ph: R() }));
+function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function drawMarkdownSide(ctx, chars) {
+  const { x, y } = PANEL; let n = 0; ctx.font = '400 30px "JetBrains Mono"'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  for (let li = 0; li < MD.length; li++) {
+    const line = MD[li]; if (n >= chars) break;
+    const shown = line.slice(0, Math.max(0, chars - n)); n += line.length + 1;
+    const ly = y + 110 + li * 54;
+    const lead = shown.match(/^(#+|[-*>]|\d+\.)\s/); // syntax markers in accent colour
+    ctx.fillStyle = '#e6edf7';
+    if (lead) { ctx.fillStyle = '#7fe3ff'; ctx.fillText(lead[0], x + 70, ly); ctx.fillStyle = '#e6edf7'; ctx.fillText(shown.slice(lead[0].length), x + 70 + ctx.measureText(lead[0]).width, ly); }
+    else ctx.fillText(shown, x + 70, ly);
+    if (n > chars) { // cursor on the active line
+      const cw = ctx.measureText(shown).width; ctx.fillStyle = 'rgba(127,227,255,0.9)'; ctx.fillRect(x + 72 + cw, ly - 2, 16, 36);
+    }
+  }
+}
+function drawWordSide(ctx) {
+  const { x, y, w, h } = PANEL;
+  ctx.fillStyle = '#f8f7f3'; ctx.fillRect(x, y + 56, w, h - 56);
+  // ruler
+  ctx.fillStyle = '#ececea'; ctx.fillRect(x, y + 56, w, 26);
+  ctx.fillStyle = '#9a9a98'; for (let i = 0; i < 44; i++) ctx.fillRect(x + 70 + i * 24, y + 64 + (i % 4 ? 6 : 0), 1, i % 4 ? 5 : 12);
+  let ly = y + 108; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  for (const line of DOC) {
+    if (line.gap) { ly += 22; continue; }
+    const size = line.h === 1 ? 50 : line.h === 2 ? 36 : 27, color = line.h ? '#2F5496' : '#1b1b1b';
+    let lx = x + 70; if (line.bullet) { ctx.fillStyle = '#1b1b1b'; ctx.font = `400 ${size}px Carlito`; ctx.fillText('•', lx + 24, ly); lx += 64; }
+    if (line.quote) { ctx.fillStyle = '#b9c3d6'; ctx.fillRect(lx, ly - 4, 6, 42); lx += 34; }
+    for (const s of line.segs) {
+      ctx.font = `${s.i ? 'italic ' : ''}${s.b || line.h ? 600 : 400} ${s.code ? size - 3 : size}px ${s.code ? '"JetBrains Mono"' : 'Carlito'}`;
+      const sw = ctx.measureText(s.t).width;
+      if (s.code) { ctx.fillStyle = '#e9e9ec'; rrect(ctx, lx - 6, ly - 4, sw + 12, size + 10, 6); ctx.fill(); ctx.fillStyle = '#c7254e'; }
+      else ctx.fillStyle = line.quote ? '#555' : color;
+      ctx.fillText(s.t, lx, ly); lx += sw;
+    }
+    ly += line.h === 1 ? 78 : line.h === 2 ? 58 : 46;
+  }
+}
+function scene3(ctx, t) {
+  bg(ctx, '#0a1424', '#03050a');
+  drawFog(ctx, t + 40, 0.05);
+  drawDust(ctx, t + 40, 1 + 0.03 * t, 0.7);
+  const s = 0.94 + 0.06 * eoCubic(t / 5), { x, y, w, h } = PANEL;
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(s, s); ctx.transform(1, 0.004 * Math.sin(t * 0.8), 0.006 * Math.sin(t * 0.6), 1, 0, 0); ctx.translate(-W / 2, -H / 2);
+  ctx.save(); ctx.globalAlpha = eoCubic(lin(0, 0.5, t));
+  // glass panel + shadow
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 80; ctx.shadowOffsetY = 30; ctx.fillStyle = '#0d1422'; rrect(ctx, x, y, w, h, 22); ctx.fill(); ctx.restore();
+  ctx.save(); rrect(ctx, x, y, w, h, 22); ctx.clip();
+  const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, 'rgba(255,255,255,0.06)'); g.addColorStop(1, 'rgba(255,255,255,0.015)'); ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  // title bar
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x, y, w, 56);
+  [['#ff5f57', 0], ['#febc2e', 1], ['#28c840', 2]].forEach(([c, i]) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 32 + i * 28, y + 28, 7, 0, 6.283); ctx.fill(); });
+  // typing
+  const chars = Math.floor(lin(0.25, 2.35, t) * MD_TOTAL);
+  const wipeU = eioCubic(lin(2.8, 4.2, t)), xw = x + w * wipeU;
+  // markdown (right of wipe)
+  ctx.save(); ctx.beginPath(); ctx.rect(xw, y, x + w - xw, h); ctx.clip(); drawMarkdownSide(ctx, chars); ctx.restore();
+  // word (left of wipe)
+  if (wipeU > 0) { ctx.save(); ctx.beginPath(); ctx.rect(x, y, xw - x, h); ctx.clip(); drawWordSide(ctx); ctx.restore(); }
+  // file chip
+  ctx.font = '500 20px Inter'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.letterSpacing = '1px';
+  const chip = wipeU > 0.12 ? 'launch-plan.docx' : 'launch-plan.md';
+  ctx.fillStyle = wipeU > 0.12 ? '#2B579A' : 'rgba(255,255,255,0.10)'; rrect(ctx, x + w / 2 - 110, y + 14, 220, 28, 14); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(chip, x + w / 2, y + 28);
+  ctx.letterSpacing = '0px';
+  // wipe line + sparks
+  if (wipeU > 0 && wipeU < 1) {
+    ctx.save(); ctx.globalCompositeOperation = 'screen';
+    const lg = ctx.createLinearGradient(xw - 90, 0, xw + 30, 0); lg.addColorStop(0, 'rgba(120,220,255,0)'); lg.addColorStop(0.75, 'rgba(120,220,255,0.35)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = lg; ctx.fillRect(xw - 90, y, 120, h);
+    ctx.fillStyle = '#dff6ff'; ctx.fillRect(xw - 2, y, 4, h); ctx.shadowColor = '#7fe3ff'; ctx.shadowBlur = 30; ctx.fillRect(xw - 2, y, 4, h);
+    for (const sp of SPARK) { const life = (t * 1.7 + sp.ph) % 1; const sx = xw - 20 - sp.dx * life * 2, sy = y + 60 + sp.y * (h - 80) + Math.sin(life * 9 + sp.ph * 6) * 14; ctx.globalAlpha = (1 - life) * 0.9; ctx.fillStyle = life < 0.3 ? '#fff' : '#9fe8ff'; ctx.fillRect(sx, sy, sp.s * 2.4, sp.s); }
+    ctx.restore();
+  }
+  ctx.restore(); // clip
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1.5; rrect(ctx, x, y, w, h, 22); ctx.stroke();
+  ctx.restore(); ctx.restore();
+  // caption
+  const cu = ss(4.2, 4.8, t);
+  text(ctx, 'ONE COMMAND. ZERO REFORMATTING.', W / 2, H - BAR - 52, { font: 'Inter', weight: 500, size: 24, ls: 10, alpha: cu * 0.85, color: '#9fd7ff' });
+}
+
+// ---------- scene 4: orbiting glass card ----------
+function drawCard(a, t) {
+  const c = cctx, w = 1040, h = 1360; c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h);
+  rrect(c, 4, 4, w - 8, h - 8, 56); c.save(); c.clip();
+  const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, 'rgba(255,255,255,0.14)'); g.addColorStop(0.5, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(255,255,255,0.10)'); c.fillStyle = '#0c1424'; c.fillRect(0, 0, w, h); c.fillStyle = g; c.fillRect(0, 0, w, h);
+  // markdown mark
+  c.strokeStyle = '#7fe3ff'; c.lineWidth = 22; c.shadowColor = '#7fe3ff'; c.shadowBlur = 50; rrect(c, 190, 300, 660, 400, 40); c.stroke(); c.shadowBlur = 0;
+  c.fillStyle = '#7fe3ff'; c.font = '700 330px "Space Grotesk"'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText('M', 250, 505);
+  c.beginPath(); c.moveTo(640, 360); c.lineTo(640, 580); c.moveTo(560, 500); c.lineTo(640, 600); c.lineTo(720, 500); c.lineWidth = 46; c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = '#7fe3ff'; c.stroke();
+  // arrow + docx
+  c.fillStyle = '#ffb15e'; c.font = '400 92px "JetBrains Mono"'; c.textAlign = 'center'; c.fillText('.md', w / 2 - 300, 860); c.fillText('.docx', w / 2 + 250, 860);
+  c.strokeStyle = '#ffb15e'; c.lineWidth = 14; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(w / 2 - 130, 860); c.lineTo(w / 2 + 30, 860); c.moveTo(w / 2 - 20, 810); c.lineTo(w / 2 + 30, 860); c.lineTo(w / 2 - 20, 910); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,0.92)'; c.font = '600 84px "Inter Display"'; c.fillText('MarkDownMac', w / 2, 1120);
+  c.fillStyle = 'rgba(255,255,255,0.5)'; c.font = '500 40px Inter'; c.letterSpacing = '8px'; c.fillText('FOR MICROSOFT WORD', w / 2 + 4, 1200); c.letterSpacing = '0px';
+  // specular sweep tied to rotation
+  const sxp = (a + 1.3) / 1.6 * w * 2.2 - w * 0.6;
+  const sg = c.createLinearGradient(sxp - 260, 0, sxp + 260, h); sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, 'rgba(255,255,255,0.28)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+  c.globalCompositeOperation = 'screen'; c.fillStyle = sg; c.fillRect(0, 0, w, h); c.globalCompositeOperation = 'source-over';
+  c.restore(); c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 4; rrect(c, 4, 4, w - 8, h - 8, 56); c.stroke();
+}
+function scene4(ctx, t) {
+  bg(ctx, '#0a1222', '#03050a');
+  const zoom = 1 + 0.05 * t;
+  drawFog(ctx, t + 80, 0.06, '90,120,255');
+  // giant parallax wordmark behind
+  text(ctx, 'MARKDOWNMAC', W / 2 - 60 * t + 200, H / 2, { font: '"Space Grotesk"', size: 340, ls: 10, alpha: 0.05, color: '#bcd8ff' });
+  drawDust(ctx, t + 80, zoom, 0.9);
+  const a = lerp(-1.15, 0.16, eoExpo(t / 2.6)) + 0.04 * Math.sin(t * 1.2);
+  const cx = W / 2, cy = H / 2 + 12 + 10 * Math.sin(t * 1.5), cw = 520, ch = 680, fl = 1500;
+  glow(ctx, cx, cy + 300, 460, `rgba(120,210,255,0.28)`);
+  drawCard(a, t);
+  const N = 48, enter = eoExpo(lin(0, 0.7, t));
+  ctx.save(); ctx.globalAlpha = enter;
+  for (let i = 0; i < N; i++) {
+    const u0 = -cw / 2 + cw * i / N, u1 = -cw / 2 + cw * (i + 1) / N;
+    const p = u => { const X = u * Math.cos(a), Z = u * Math.sin(a), s = fl / (fl + Z); return { x: cx + X * s, s }; };
+    const p0 = p(u0), p1 = p(u1), hh = ch * p0.s * enter;
+    ctx.drawImage(cardC, (1040 * i / N) | 0, 0, Math.ceil(1040 / N), 1360, p0.x, cy - hh / 2, Math.max(1, p1.x - p0.x + 1.2), hh);
+  }
+  ctx.restore();
+  // side copy
+  const ul = eoExpo(lin(1.0, 1.8, t)), ur = eoExpo(lin(1.2, 2.0, t));
+  text(ctx, 'MARKDOWN', 150 - (1 - ul) * 300, H / 2 - 50, { font: '"Space Grotesk"', size: 96, align: 'left', ls: 2, alpha: ul });
+  text(ctx, 'IN.', 150 - (1 - ul) * 300, H / 2 + 60, { font: '"Space Grotesk"', size: 96, align: 'left', ls: 2, alpha: ul, color: '#7fe3ff' });
+  text(ctx, 'WORD', W - 150 + (1 - ur) * 300, H / 2 - 50, { font: '"Space Grotesk"', size: 96, align: 'right', ls: 2, alpha: ur });
+  text(ctx, 'OUT.', W - 150 + (1 - ur) * 300, H / 2 + 60, { font: '"Space Grotesk"', size: 96, align: 'right', ls: 2, alpha: ur, color: '#ffb15e' });
+}
+
+// ---------- scene 5: lockup + anamorphic flare ----------
+function scene5(ctx, t) {
+  bg(ctx, '#091020', '#02040a');
+  drawFog(ctx, t + 120, 0.05);
+  drawDust(ctx, t + 120, 1.02 + 0.02 * t, 0.8);
+  const u = eoExpo(lin(0, 0.9, t)), sc = 1.06 - 0.06 * u;
+  const fu = eioCubic(lin(0.3, 1.7, t)), fx = lerp(-500, W + 500, fu), fy = H / 2 + 20;
+  const near = Math.exp(-Math.pow((fx - W / 2) / 500, 2));
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(sc, sc); ctx.translate(-W / 2, -H / 2);
+  text(ctx, 'MarkDownMac', W / 2, H / 2 - 20, { font: '"Inter Display"', weight: 600, size: 160, ls: -4, alpha: u, blur: (1 - u) * 20, color: `rgb(${255},${255},${255})` });
+  text(ctx, 'FOR MICROSOFT WORD', W / 2, H / 2 + 100, { font: 'Inter', weight: 500, size: 30, ls: 14, alpha: u * 0.75, color: '#bfe3ff' });
+  ctx.restore();
+  // anamorphic flare
+  if (fu > 0 && fu < 1) {
+    ctx.save(); ctx.globalCompositeOperation = 'screen';
+    const sg = ctx.createLinearGradient(fx - 1400, 0, fx + 1400, 0); sg.addColorStop(0, 'rgba(90,190,255,0)'); sg.addColorStop(0.5, 'rgba(170,230,255,0.85)'); sg.addColorStop(1, 'rgba(90,190,255,0)');
+    ctx.fillStyle = sg; ctx.fillRect(fx - 1400, fy - 2, 2800, 4);
+    const bg2 = ctx.createLinearGradient(0, fy - 70, 0, fy + 70); bg2.addColorStop(0, 'rgba(90,190,255,0)'); bg2.addColorStop(0.5, 'rgba(110,200,255,0.35)'); bg2.addColorStop(1, 'rgba(90,190,255,0)');
+    ctx.fillStyle = bg2; ctx.fillRect(fx - 1100, fy - 70, 2200, 140);
+    glow(ctx, fx, fy, 230, 'rgba(255,255,255,0.95)'); glow(ctx, fx, fy, 700, 'rgba(120,200,255,0.35)');
+    for (let i = 1; i <= 5; i++) { const gx = W / 2 - (fx - W / 2) * (0.25 * i); glow(ctx, gx, fy + (i % 2 ? 30 : -30), 40 + i * 28, i % 2 ? 'rgba(255,177,94,0.18)' : 'rgba(127,227,255,0.16)'); }
+    ctx.restore();
+    // bloom on the wordmark as the flare passes
+    text(ctx, 'MarkDownMac', W / 2, H / 2 - 20, { font: '"Inter Display"', weight: 600, size: 160, ls: -4, alpha: near * 0.8, blur: 18, color: '#cfeeff', comp: 'screen' });
+  }
+}
+
+// ---------- compositing ----------
+function renderScene(ctx, t) {
+  if (t < CUT.s2) scene1(ctx, t);
+  else if (t < CUT.s3) scene2(ctx, t - CUT.s2);
+  else if (t < CUT.s4) scene3(ctx, t - CUT.s3);
+  else if (t < CUT.s5) scene4(ctx, t - CUT.s4);
+  else scene5(ctx, t - CUT.s5);
+}
+const CUTS = [CUT.s2, CUT.s3, CUT.s4];
+function flash(t) { let f = 0; for (const c of CUTS) { if (t >= c) f += Math.exp(-(t - c) * 14); else if (t > c - 0.12) f += ss(c - 0.12, c, t) * 0.6; } return f; }
+function aberration(t) {
+  let a = 3 * flash(t);
+  if (t > 1.1 && t < 2.6) a += (1 - eoExpo(lin(1.1, 2.5, t))) * 9;
+  a += bell(CUT.s3 + 2.8, CUT.s3 + 4.2, t) * 5;
+  a += bell(CUT.s5 + 0.3, CUT.s5 + 1.7, t) * 2.5;
+  a += lin(3.5, 4.2, t) * (1 - lin(4.2, 4.25, t)) * 10;
+  return a;
+}
+function shake(t) { let a = 0; for (const c of CUTS) if (t >= c) a += 14 * Math.exp(-(t - c) * 7); return { x: a * Math.sin(t * 73), y: a * Math.cos(t * 59) }; }
+
+// grain tiles (mid-grey gaussian noise, used with 'overlay')
+const GR = mulberry32(99);
+const GRAIN = Array.from({ length: 4 }, () => { const c = mk(512, 512), g = c.getContext('2d'), im = g.createImageData(512, 512), d = im.data; for (let i = 0; i < d.length; i += 4) { let n = 0; for (let k = 0; k < 4; k++) n += GR(); n = (n - 2) * 24 + 128; d[i] = d[i + 1] = d[i + 2] = n; d[i + 3] = 255; } g.putImageData(im, 0, 0); return c; });
+
+function channel(src, color) { tctx.globalCompositeOperation = 'source-over'; tctx.drawImage(src, 0, 0); tctx.globalCompositeOperation = 'multiply'; tctx.fillStyle = color; tctx.fillRect(0, 0, W, H); }
+
+function renderFrame(frame) {
+  const t = frame / FPS;
+  // scene (with dissolve S4 -> S5)
+  const dis = lin(CUT.s5 - 0.25, CUT.s5 + 0.25, t);
+  if (dis > 0 && dis < 1) { scene4(sctx, t - CUT.s4); scene5(sbctx, t - CUT.s5); sctx.save(); sctx.globalAlpha = eioCubic(dis); sctx.drawImage(sb, 0, 0); sctx.restore(); }
+  else renderScene(sctx, t);
+
+  const o = octx; o.setTransform(1, 0, 0, 1, 0, 0); o.globalAlpha = 1; o.globalCompositeOperation = 'source-over'; o.filter = 'none';
+  o.fillStyle = '#000'; o.fillRect(0, 0, W, H);
+  const sh = shake(t), ca = aberration(t);
+  // subtle breathing zoom
+  const br = 1.012 + 0.006 * Math.sin(t * 0.7);
+  o.translate(W / 2 + sh.x, H / 2 + sh.y); o.scale(br, br); o.translate(-W / 2, -H / 2);
+  if (ca > 0.4) {
+    o.globalCompositeOperation = 'lighter';
+    channel(sc, '#ff0000'); o.drawImage(tmp, -ca, 0);
+    channel(sc, '#00ff00'); o.drawImage(tmp, 0, 0);
+    channel(sc, '#0000ff'); o.drawImage(tmp, ca, 0);
+    o.globalCompositeOperation = 'source-over';
+  } else o.drawImage(sc, 0, 0);
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  // light leak + flash at cuts
+  const fl = flash(t);
+  if (fl > 0.01) {
+    glow(o, W * 0.85, H * 0.2, 1200, `rgba(255,190,120,${Math.min(0.5, fl * 0.45)})`);
+    o.fillStyle = `rgba(235,245,255,${Math.min(1, fl * 0.95)})`; o.fillRect(0, 0, W, H);
+  }
+  // vignette
+  const vg = o.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 1.05); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.62)'); o.fillStyle = vg; o.fillRect(0, 0, W, H);
+  // grain
+  o.save(); o.globalCompositeOperation = 'overlay'; o.globalAlpha = 0.17;
+  const gt = GRAIN[frame % 4], ox = -Math.floor(hash(frame * 1.7) * 512), oy = -Math.floor(hash(frame * 2.9) * 512);
+  for (let yy = oy; yy < H; yy += 512) for (let xx = ox; xx < W; xx += 512) o.drawImage(gt, xx, yy);
+  o.restore();
+  // fade in / out
+  const fade = Math.max(1 - lin(0, 0.6, t), lin(19.25, 19.95, t));
+  if (fade > 0) { o.fillStyle = `rgba(0,0,0,${fade})`; o.fillRect(0, 0, W, H); }
+  // letterbox
+  o.fillStyle = '#000'; o.fillRect(0, 0, W, BAR); o.fillRect(0, H - BAR, W, BAR);
+  return out.toDataURL('image/jpeg', 0.94);
+}
+window.renderFrame = renderFrame;
+window.ready = Promise.all([
+  document.fonts.load('700 100px "Space Grotesk"'), document.fonts.load('400 30px "JetBrains Mono"'),
+  document.fonts.load('600 100px "Inter Display"'), document.fonts.load('500 30px Inter'), document.fonts.load('400 30px Carlito'), document.fonts.load('italic 400 30px Carlito'), document.fonts.load('600 30px Carlito'),
+]).then(() => ({ grotesk: document.fonts.check('700 100px "Space Grotesk"'), mono: document.fonts.check('400 30px "JetBrains Mono"') }));
+</script>
+</body>
+</html>
